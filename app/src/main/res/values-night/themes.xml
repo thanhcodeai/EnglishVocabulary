@@ -1,7 +1,1 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Base.Theme.EnglishVocabulary" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
-    </style>
-</resources>
+<resources><style name="Base.Theme.EnglishVocabulary" parent="Theme.Material3.DayNight.NoActionBar"><item name="colorPrimary">#9DD5AA</item><item name="colorSecondary">#BACCB5</item><item name="android:windowLightStatusBar">false</item></style><style name="Theme.EnglishVocabulary" parent="Base.Theme.EnglishVocabulary" /></resources>

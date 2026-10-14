@@ -18,6 +18,19 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    bundle { language { enableSplit = false } }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            it.systemProperty("robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2")
+            val testHome = layout.buildDirectory.dir("test-home").get().asFile
+            testHome.mkdirs()
+            it.systemProperty("user.home", testHome.absolutePath)
+            it.maxHeapSize = "2g"
+        }
+    }
+
     buildTypes {
         release {
             optimization {
@@ -26,12 +39,14 @@ android {
         }
     }
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
 }
 
 dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation(libs.activity.ktx)
     implementation(libs.appcompat)
     implementation(libs.constraintlayout)
@@ -50,6 +65,7 @@ dependencies {
 
     // Unit Test
     testImplementation(libs.junit)
+    testImplementation("org.robolectric:robolectric:4.16.1")
 
     // Instrumentation Test
     androidTestImplementation(libs.espresso.core)
