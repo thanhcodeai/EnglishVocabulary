@@ -27,6 +27,7 @@ android {
             val testHome = layout.buildDirectory.dir("test-home").get().asFile
             testHome.mkdirs()
             it.systemProperty("user.home", testHome.absolutePath)
+            it.systemProperty("ui.screenshot.dir", layout.buildDirectory.dir("design-renders").get().asFile.absolutePath)
             it.maxHeapSize = "2g"
         }
     }

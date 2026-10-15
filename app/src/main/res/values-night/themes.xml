@@ -1,20 +1,10 @@
-<resources>
-    <style name="Base.Theme.EnglishVocabulary" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/ui_brand</item>
-        <item name="colorOnPrimary">#241D42</item>
-        <item name="colorPrimaryContainer">@color/ui_brand_soft</item>
-        <item name="colorOnPrimaryContainer">@color/ui_on_brand_soft</item>
-        <item name="colorSecondary">@color/ui_brand</item>
-        <item name="colorSecondaryContainer">@color/ui_brand_soft</item>
-        <item name="colorOnSecondaryContainer">@color/ui_on_brand_soft</item>
-        <item name="colorSurface">@color/ui_card</item>
-        <item name="colorOnSurface">@color/ui_ink</item>
-        <item name="colorOnSurfaceVariant">@color/ui_muted</item>
-        <item name="colorOutline">@color/ui_line</item>
-        <item name="android:colorBackground">@color/ui_page</item>
-        <item name="android:windowBackground">@color/ui_page</item>
-        <item name="android:fontFamily">sans</item>
-        <item name="android:windowLightStatusBar">false</item>
-    </style>
-    <style name="Theme.EnglishVocabulary" parent="Base.Theme.EnglishVocabulary" />
-</resources>
+<resources><style name="Base.Theme.EnglishVocabulary" parent="Theme.Material3.DayNight.NoActionBar">
+ <item name="colorPrimary">@color/ui_brand</item><item name="colorOnPrimary">#163000</item>
+ <item name="colorPrimaryContainer">@color/ui_brand_soft</item><item name="colorOnPrimaryContainer">@color/ui_on_brand_soft</item>
+ <item name="colorSecondary">@color/ui_blue</item><item name="colorSecondaryContainer">@color/ui_brand_soft</item><item name="colorOnSecondaryContainer">@color/ui_on_brand_soft</item>
+ <item name="colorSurface">@color/ui_card</item><item name="colorOnSurface">@color/ui_ink</item><item name="colorOnSurfaceVariant">@color/ui_muted</item><item name="colorOutline">@color/ui_line</item>
+ <item name="android:colorBackground">@color/ui_page</item><item name="android:windowBackground">@color/ui_page</item>
+ <item name="android:fontFamily">@font/nunito_regular</item><item name="fontFamily">@font/nunito_regular</item>
+ <item name="materialButtonStyle">@style/Widget.Vocabulary.Button</item>
+ <item name="android:windowLightStatusBar">false</item>
+ </style><style name="Theme.EnglishVocabulary" parent="Base.Theme.EnglishVocabulary" /></resources>

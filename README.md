@@ -2,6 +2,12 @@
 
 Ứng dụng Android Java, Room và MVVM triển khai theo `SRS_Android_Hoc_Tu_Vung_v1.docx` (14/10/2026). Tài khoản và dữ liệu hoạt động cục bộ, không cần Internet khi sử dụng ứng dụng.
 
+## Giao diện
+
+![Các màn hình chính](docs/design/overview.png)
+
+[Xem toàn bộ ảnh giao diện, chế độ tối và chữ lớn](docs/design/README.md).
+
 ## Chạy ứng dụng
 
 Mở project bằng Android Studio, dùng **JDK 25**, Android SDK **37.0** và Gradle wrapper **9.6.0**, rồi chạy cấu hình `app` trên thiết bị Android API 24 trở lên.

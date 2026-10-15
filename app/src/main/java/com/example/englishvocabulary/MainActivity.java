@@ -5,7 +5,6 @@ import android.content.*;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
-import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.*;
 import android.text.*;
@@ -28,12 +27,13 @@ import com.example.englishvocabulary.learning.*;
 import com.example.englishvocabulary.learning.Records.*;
 import com.example.englishvocabulary.learning.Records.Collection;
 import com.example.englishvocabulary.ui.AppViewModel;
+import com.example.englishvocabulary.ui.LessonProgressView;
+import com.example.englishvocabulary.ui.PlayfulUi;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.android.material.textfield.*;
 import java.text.DateFormat;
@@ -45,6 +45,7 @@ import org.json.JSONArray;
 /** Views render state only; all persistence and business rules go through the ViewModel. */
 public class MainActivity extends AppCompatActivity {
   private AppViewModel vm;
+  private PlayfulUi ui;
   private LinearLayout content;
   private ScrollView scroll;
   private RecyclerView list;
@@ -53,6 +54,16 @@ public class MainActivity extends AppCompatActivity {
   private TextView message;
   private View loading;
   private boolean selecting;
+  private String renderedKey = "";
+  private int scrollTarget;
+  private boolean restoringScroll;
+  private final Runnable restoreScroll =
+      () -> {
+        if (scroll != null) {
+          scroll.scrollTo(0, scrollTarget);
+          restoringScroll = false;
+        }
+      };
   private EditText answerField;
   private String selectedAnswer;
   private int displayedIndex;
@@ -84,6 +95,7 @@ public class MainActivity extends AppCompatActivity {
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
+    ui = new PlayfulUi(this);
     vm = new ViewModelProvider(this).get(AppViewModel.class);
     content = findViewById(R.id.content);
     scroll = findViewById(R.id.scroll);
@@ -219,6 +231,15 @@ public class MainActivity extends AppCompatActivity {
     message.setVisibility(resource == 0 ? View.GONE : View.VISIBLE);
     if (resource == 0) return;
     message.setText(resource);
+    boolean success =
+        Arrays.asList(
+                R.string.saved,
+                R.string.registered,
+                R.string.password_changed,
+                R.string.settings_saved)
+            .contains(resource);
+    message.setTextColor(color(success ? R.color.ui_brand : R.color.ui_red));
+    message.setBackgroundResource(success ? R.drawable.bg_soft : R.drawable.bg_error);
     String field =
         resource == R.string.error_email || resource == R.string.error_email_used
             ? "email"
@@ -237,85 +258,101 @@ public class MainActivity extends AppCompatActivity {
   }
 
   private TextView text(CharSequence value, boolean title) {
-    TextView v = new TextView(this);
-    v.setText(value);
-    v.setTextAppearance(
-        title
-            ? com.google.android.material.R.style.TextAppearance_Material3_HeadlineSmall
-            : com.google.android.material.R.style.TextAppearance_Material3_BodyLarge);
-    v.setTextColor(color(title ? R.color.ui_ink : R.color.ui_muted));
-    v.setLineSpacing(dp(3), 1f);
-    if (title) v.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-    v.setPadding(0, dp(10), 0, dp(10));
-    content.addView(v, new LinearLayout.LayoutParams(-1, -2));
-    return v;
+    TextView view = ui.label(value, title ? 24 : 15, title);
+    view.setPadding(0, dp(8), 0, dp(8));
+    content.addView(view, new LinearLayout.LayoutParams(-1, -2));
+    return view;
   }
 
   private TextView text(int resource) {
     return text(getString(resource), false);
   }
 
+  private void intro(int title, int caption, int icon) {
+    content.addView(ui.intro(title, caption, icon), ui.spaced());
+  }
+
+  private void section(int title) {
+    TextView view = text(getString(title), true);
+    view.setTextSize(19);
+    LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) view.getLayoutParams();
+    params.topMargin = dp(14);
+    view.setLayoutParams(params);
+  }
+
+  private void info(int title, String value, int background) {
+    content.addView(ui.info(getString(title), value, background), ui.spaced());
+  }
+
   private MaterialButton button(CharSequence label, Runnable action) {
-    MaterialButton b = new MaterialButton(this);
-    b.setText(label);
-    b.setMinHeight(dp(54));
-    b.setCornerRadius(dp(16));
-    b.setTextSize(15);
-    b.setAllCaps(false);
-    b.setInsetTop(0);
-    b.setInsetBottom(0);
-    b.setStrokeWidth(dp(1));
-    b.setStrokeColor(ColorStateList.valueOf(color(R.color.ui_line)));
-    b.setBackgroundTintList(
-        new ColorStateList(
-            new int[][] {new int[] {-android.R.attr.state_enabled}, new int[] {}},
-            new int[] {color(R.color.ui_line), color(R.color.ui_card)}));
-    b.setTextColor(
-        new ColorStateList(
-            new int[][] {new int[] {-android.R.attr.state_enabled}, new int[] {}},
-            new int[] {color(R.color.ui_muted), color(R.color.ui_brand)}));
-    b.setOnClickListener(
+    MaterialButton button = new MaterialButton(this);
+    button.setText(label);
+    ui.button(button, false);
+    button.setOnClickListener(
         v -> {
           if (!Boolean.TRUE.equals(vm.busy.getValue())) action.run();
         });
-    LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(-1, -2);
-    buttonParams.topMargin = dp(8);
-    buttonParams.bottomMargin = dp(4);
-    content.addView(b, buttonParams);
-    return b;
+    content.addView(button, ui.spaced());
+    return button;
   }
 
   private MaterialButton button(int resource, Runnable action) {
-    MaterialButton b = button(getString(resource), action);
-    if (Arrays.asList(
-            R.string.save,
-            R.string.start,
-            R.string.sign_in,
-            R.string.register,
-            R.string.submit,
-            R.string.finish,
-            R.string.remember)
-        .contains(resource)) {
-      b.setStrokeWidth(0);
-      b.setBackgroundTintList(
-          new ColorStateList(
-              new int[][] {new int[] {-android.R.attr.state_enabled}, new int[] {}},
-              new int[] {color(R.color.ui_line), color(R.color.ui_brand)}));
-      int onPrimary =
-          com.google.android.material.color.MaterialColors.getColor(
-              b, com.google.android.material.R.attr.colorOnPrimary);
-      b.setTextColor(
-          new ColorStateList(
-              new int[][] {new int[] {-android.R.attr.state_enabled}, new int[] {}},
-              new int[] {color(R.color.ui_muted), onPrimary}));
-    }
-    if (resource == R.string.delete_collection
-        || resource == R.string.reset_learning
-        || resource == R.string.logout)
-      b.setTextColor(
-          com.google.android.material.color.MaterialColors.getColor(
-              b, androidx.appcompat.R.attr.colorError));
+    MaterialButton button = button(getString(resource), action);
+    ui.button(
+        button,
+        Arrays.asList(
+                R.string.save,
+                R.string.start,
+                R.string.sign_in,
+                R.string.register,
+                R.string.submit,
+                R.string.finish,
+                R.string.remember,
+                R.string.start_lesson)
+            .contains(resource));
+    if (Arrays.asList(R.string.delete_collection, R.string.reset_learning, R.string.logout)
+        .contains(resource)) button.setTextColor(color(R.color.ui_red));
+    return button;
+  }
+
+  private MaterialButton menu(int title, int icon, Runnable action) {
+    MaterialButton b = button(title, action);
+    b.setIconResource(icon);
+    b.setIconTint(ColorStateList.valueOf(color(R.color.ui_brand)));
+    b.setIconPadding(dp(14));
+    b.setIconSize(dp(24));
+    b.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
     return b;
+  }
+
+  private void pair(MaterialButton first, MaterialButton second) {
+    content.removeView(first);
+    content.removeView(second);
+    LinearLayout row = new LinearLayout(this);
+    row.setOrientation(LinearLayout.HORIZONTAL);
+    LinearLayout.LayoutParams a = new LinearLayout.LayoutParams(0, -2, 1);
+    a.setMarginEnd(dp(6));
+    row.addView(first, a);
+    LinearLayout.LayoutParams b = new LinearLayout.LayoutParams(0, -2, 1);
+    b.setMarginStart(dp(6));
+    row.addView(second, b);
+    content.addView(row, ui.spaced());
+  }
+
+  private void empty() {
+    LinearLayout box = ui.panel(R.drawable.bg_soft);
+    box.setGravity(Gravity.CENTER);
+    ImageView illustration = new ImageView(this);
+    illustration.setImageResource(R.drawable.companion_fox);
+    illustration.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+    box.addView(illustration, new LinearLayout.LayoutParams(dp(112), dp(112)));
+    TextView title = ui.label(getString(R.string.empty_title), 21, true);
+    title.setGravity(Gravity.CENTER);
+    box.addView(title);
+    TextView caption = ui.label(getString(R.string.empty_caption), 14, false);
+    caption.setGravity(Gravity.CENTER);
+    box.addView(caption, ui.spaced());
+    content.addView(box, ui.spaced());
   }
 
   private EditText field(String key, int label, int inputType, String initial) {
@@ -323,13 +360,18 @@ public class MainActivity extends AppCompatActivity {
     wrapper.setHint(getString(label));
     wrapper.setBoxBackgroundMode(TextInputLayout.BOX_BACKGROUND_OUTLINE);
     wrapper.setBoxCornerRadii(dp(16), dp(16), dp(16), dp(16));
-    wrapper.setBoxBackgroundColor(color(R.color.ui_card));
+    wrapper.setBoxBackgroundColor(color(R.color.ui_disabled));
+    wrapper.setBoxStrokeColor(color(R.color.ui_brand));
+    wrapper.setBoxStrokeWidth(dp(2));
+    wrapper.setBoxStrokeWidthFocused(dp(2));
     if ((inputType & InputType.TYPE_TEXT_VARIATION_PASSWORD)
         == InputType.TYPE_TEXT_VARIATION_PASSWORD)
       wrapper.setEndIconMode(TextInputLayout.END_ICON_PASSWORD_TOGGLE);
     TextInputEditText edit = new TextInputEditText(wrapper.getContext());
     edit.setInputType(inputType);
-    edit.setMinHeight(dp(56));
+    edit.setMinHeight(dp(58));
+    edit.setTextColor(color(R.color.ui_ink));
+    edit.setTextSize(17);
     edit.setText(vm.input(screen() + "." + key, initial));
     wrapper.addView(edit, new LinearLayout.LayoutParams(-1, -2));
     LinearLayout.LayoutParams fieldParams = new LinearLayout.LayoutParams(-1, -2);
@@ -354,8 +396,10 @@ public class MainActivity extends AppCompatActivity {
     Spinner spinner = new Spinner(this);
     spinner.setMinimumHeight(dp(48));
     spinner.setContentDescription(getString(title));
-    spinner.setAdapter(
-        new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, labels));
+    ArrayAdapter<String> adapter = new ArrayAdapter<>(this, R.layout.spinner_value, labels);
+    adapter.setDropDownViewResource(R.layout.spinner_dropdown);
+    spinner.setAdapter(adapter);
+    spinner.setBackgroundResource(R.drawable.button_outline);
     String spinnerKey = screen() + ".spinner." + getResources().getResourceEntryName(title);
     int position = Integer.parseInt(vm.input(spinnerKey, String.valueOf(selected)));
     spinner.setSelection(Math.max(0, Math.min(position, labels.size() - 1)));
@@ -380,6 +424,31 @@ public class MainActivity extends AppCompatActivity {
     AppState s = vm.data();
     Bundle route = vm.current();
     String page = screen();
+    String nextKey =
+        page
+            + "/"
+            + route.getString("sourceType", "")
+            + "/"
+            + route.getLong("sourceId")
+            + "/"
+            + route.getInt("wordId");
+    if ("SESSION".equals(page)) {
+      Session active = s.session(route.getString("sessionId"));
+      if (active != null)
+        nextKey += "/" + active.sessionId + "/" + active.currentIndex + "/" + active.cardFace;
+    }
+    boolean changed = !renderedKey.equals(nextKey);
+    if (changed) scrollTarget = 0;
+    else if (!restoringScroll) scrollTarget = scroll.getScrollY();
+    renderedKey = nextKey;
+    restoringScroll = true;
+    scroll.removeCallbacks(restoreScroll);
+    scroll.post(restoreScroll);
+    if (changed) {
+      content.setFocusableInTouchMode(true);
+      content.requestFocus();
+    }
+
     content.removeAllViews();
     temporarilyDisabled.clear();
     fields.clear();
@@ -388,7 +457,7 @@ public class MainActivity extends AppCompatActivity {
     list.setVisibility(View.GONE);
     scroll.setVisibility(View.VISIBLE);
     scroll.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1));
-    navigation.setVisibility(s.user == null ? View.GONE : View.VISIBLE);
+    navigation.setVisibility(s.user == null || "SESSION".equals(page) ? View.GONE : View.VISIBLE);
     toolbar.setNavigationIcon(
         Arrays.asList("HOME", "TOPICS", "LEARNING", "FAVORITES", "PROFILE", "LOGIN").contains(page)
             ? null
@@ -421,6 +490,8 @@ public class MainActivity extends AppCompatActivity {
                               || "HISTORY".equals(root)
                               || "STATS".equals(root)
                               || "ACHIEVEMENTS".equals(root)
+                              || "EDIT_PROFILE".equals(root)
+                              || "PASSWORD".equals(root)
                               || "ABOUT".equals(root)
                           ? R.id.nav_profile
                           : R.id.nav_home;
@@ -467,6 +538,9 @@ public class MainActivity extends AppCompatActivity {
       case "COLLECTION_FORM":
         collectionForm(route);
         break;
+      case "EDIT_PROFILE":
+        profileEditor(s);
+        break;
       case "PASSWORD":
         passwordScreen();
         break;
@@ -495,10 +569,19 @@ public class MainActivity extends AppCompatActivity {
 
   private void auth(boolean registration) {
     toolbar.setTitle(registration ? R.string.register : R.string.sign_in);
-    text(getString(R.string.auth_headline), true).setTextSize(30);
-    text(R.string.auth_caption);
-    TextView local = text(R.string.local_accounts);
-    local.setTextSize(12);
+    LinearLayout welcome = ui.column();
+    welcome.setGravity(Gravity.CENTER);
+    ImageView fox = new ImageView(this);
+    fox.setImageResource(R.drawable.companion_fox);
+    fox.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+    welcome.addView(fox, new LinearLayout.LayoutParams(dp(120), dp(120)));
+    TextView headline = ui.label(getString(R.string.auth_welcome), 28, true);
+    headline.setGravity(Gravity.CENTER);
+    welcome.addView(headline);
+    TextView caption = ui.label(getString(R.string.auth_support), 14, false);
+    caption.setGravity(Gravity.CENTER);
+    welcome.addView(caption, ui.spaced());
+    content.addView(welcome, ui.spaced());
     EditText name =
         registration ? field("name", R.string.display_name, InputType.TYPE_CLASS_TEXT, "") : null;
     EditText email =
@@ -527,9 +610,14 @@ public class MainActivity extends AppCompatActivity {
           if (registration) vm.register(value(name), value(email), value(password), value(confirm));
           else vm.login(value(email), value(password));
         });
-    button(
-        registration ? R.string.sign_in : R.string.register,
-        () -> vm.root(registration ? "LOGIN" : "REGISTER"));
+    MaterialButton alternate =
+        button(
+            registration ? R.string.sign_in : R.string.register,
+            () -> vm.root(registration ? "LOGIN" : "REGISTER"));
+    ui.button(alternate, false);
+    TextView privacy = text(R.string.local_accounts);
+    privacy.setTextSize(12);
+    privacy.setGravity(Gravity.CENTER);
     MaterialButton reload = button(R.string.retry, vm::refresh);
     reload.setStrokeWidth(0);
     reload.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT));
@@ -576,9 +664,9 @@ public class MainActivity extends AppCompatActivity {
   private void metric(LinearLayout parent, String value, int caption) {
     LinearLayout box = vertical();
     box.setPadding(dp(18), dp(18), dp(18), dp(18));
-    box.setBackgroundResource(R.drawable.bg_soft);
+    box.setBackgroundResource(R.drawable.button_outline);
     TextView number = label(value, 26, color(R.color.ui_on_brand_soft));
-    number.setTypeface(Typeface.DEFAULT_BOLD);
+    number.setTypeface(ui.bold());
     box.addView(number);
     space(box, 6);
     box.addView(label(getString(caption), 12, color(R.color.ui_on_brand_soft)));
@@ -589,15 +677,17 @@ public class MainActivity extends AppCompatActivity {
 
   private void tile(LinearLayout row, int title, int subtitle, int icon, Runnable action) {
     MaterialCardView card = new MaterialCardView(this);
-    card.setRadius(dp(24));
+    card.setRadius(dp(20));
     card.setCardElevation(0);
     card.setCardBackgroundColor(color(R.color.ui_card));
     card.setStrokeColor(color(R.color.ui_line));
-    card.setStrokeWidth(dp(1));
+    card.setStrokeWidth(dp(2));
     card.setClickable(true);
     card.setFocusable(true);
     LinearLayout box = vertical();
-    box.setPadding(dp(18), dp(20), dp(16), dp(20));
+    box.setPadding(dp(16), dp(18), dp(14), dp(20));
+    box.setBackgroundResource(
+        icon == R.drawable.ic_spark ? R.drawable.bg_blue : R.drawable.bg_soft);
     ImageView image = new ImageView(this);
     image.setImageResource(icon);
     image.setImageTintList(ColorStateList.valueOf(color(R.color.ui_brand)));
@@ -605,7 +695,7 @@ public class MainActivity extends AppCompatActivity {
     box.addView(image, new LinearLayout.LayoutParams(dp(28), dp(28)));
     space(box, 18);
     TextView heading = label(getString(title), 17, color(R.color.ui_ink));
-    heading.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+    heading.setTypeface(ui.bold());
     box.addView(heading);
     space(box, 6);
     box.addView(label(getString(subtitle), 12, color(R.color.ui_muted)));
@@ -632,70 +722,47 @@ public class MainActivity extends AppCompatActivity {
 
   private void home(AppState s) {
     toolbar.setTitle(R.string.app_name);
-    TextView kicker = text(getString(R.string.home_kicker), false);
-    kicker.setTextSize(10);
-    kicker.setLetterSpacing(.12f);
-    text(getString(R.string.greeting, s.user.name), true).setTextSize(25);
-    text(R.string.home_caption);
-    LinearLayout hero = vertical();
-    hero.setPadding(dp(24), dp(24), dp(24), dp(24));
-    hero.setBackgroundResource(R.drawable.bg_hero);
-    TextView headline = label(getString(R.string.home_headline), 30, Color.WHITE);
-    headline.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-    hero.addView(headline);
-    space(hero, 22);
-    hero.addView(label(getString(R.string.daily_target), 13, 0xFFE5DFFF));
-    space(hero, 6);
-    TextView goal =
-        label(getString(R.string.progress, s.today(), s.settings.dailyGoal), 17, Color.WHITE);
-    hero.addView(goal);
-    space(hero, 14);
-    LinearProgressIndicator progress = new LinearProgressIndicator(this);
-    progress.setMax(100);
-    progress.setTrackCornerRadius(dp(4));
-    progress.setTrackThickness(dp(7));
-    progress.setIndicatorColor(Color.WHITE);
-    progress.setTrackColor(0x447C6ACC);
-    progress.setProgress((int) Math.min(100, 100L * s.today() / s.settings.dailyGoal));
-    progress.setContentDescription(goal.getText());
-    hero.addView(progress, new LinearLayout.LayoutParams(-1, dp(8)));
-    LinearLayout.LayoutParams heroParams = new LinearLayout.LayoutParams(-1, -2);
-    heroParams.topMargin = dp(12);
-    heroParams.bottomMargin = dp(18);
-    content.addView(hero, heroParams);
-    LinearLayout metrics = new LinearLayout(this);
-    metrics.setOrientation(LinearLayout.HORIZONTAL);
-    metric(metrics, String.valueOf(s.learned()), R.string.learned_words);
-    metric(metrics, String.valueOf(s.streak()), R.string.streak_days);
-    content.addView(metrics);
-    text(getString(R.string.quick_practice), true).setTextSize(20);
-    LinearLayout first = tileRow();
+    LinearLayout chips = new LinearLayout(this);
+    metric(chips, String.valueOf(s.streak()), R.string.streak_days);
+    metric(chips, String.valueOf(s.learned()), R.string.learned_words);
+    content.addView(chips, ui.spaced());
+    TextView greeting = text(getString(R.string.greeting, s.user.name), true);
+    greeting.setTextSize(24);
+    intro(R.string.companion_message, R.string.home_caption, R.drawable.companion_fox);
+    LinearLayout goal = ui.panel(R.drawable.button_outline);
+    TextView title = ui.label(getString(R.string.daily_target), 18, true);
+    goal.addView(title);
+    TextView count =
+        ui.label(getString(R.string.progress_short, s.today(), s.settings.dailyGoal), 14, false);
+    goal.addView(count);
+    LessonProgressView bar = progress(s.today(), s.settings.dailyGoal);
+    LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, dp(16));
+    bp.topMargin = dp(14);
+    goal.addView(bar, bp);
+    content.addView(goal, ui.spaced());
+    button(R.string.start_lesson, () -> vm.root("TOPICS"));
+    section(R.string.quick_practice);
+    LinearLayout modes = tileRow();
     tile(
-        first,
+        modes,
         R.string.flashcards,
         R.string.flash_hint,
-        R.drawable.ic_learning,
+        R.drawable.ic_book,
         () -> chooseSource("FLASH"));
-    tile(
-        first, R.string.quiz, R.string.quiz_hint, R.drawable.ic_topics, () -> chooseSource("QUIZ"));
-    LinearLayout second = tileRow();
-    tile(
-        second,
-        R.string.topics,
-        R.string.explore_hint,
-        R.drawable.ic_topics,
-        () -> vm.root("TOPICS"));
-    tile(
-        second,
-        R.string.favorites,
-        R.string.favorite_hint,
-        R.drawable.ic_favorite,
-        () -> vm.root("FAVORITES"));
-    if (s.learned() == 0) text(R.string.start_hint).setTextSize(13);
-    button(R.string.review, () -> openSource("REVIEW", 0, getString(R.string.review)));
+    tile(modes, R.string.quiz, R.string.quiz_hint, R.drawable.ic_spark, () -> chooseSource("QUIZ"));
+    menu(
+        R.string.review,
+        R.drawable.ic_flame,
+        () -> openSource("REVIEW", 0, getString(R.string.review)));
     for (Session session : s.sessions)
       if ("IN_PROGRESS".equals(session.status))
         button(getString(R.string.pending_session, session.sourceName), () -> openSession(session));
+  }
+
+  private LessonProgressView progress(int value, int total) {
+    LessonProgressView bar = new LessonProgressView(this, value, total);
+    bar.setContentDescription(getString(R.string.progress_short, value, total));
+    return bar;
   }
 
   private void openSession(Session s) {
@@ -727,7 +794,7 @@ public class MainActivity extends AppCompatActivity {
 
   private void rows(List<Row> rows) {
     if (rows.isEmpty()) {
-      text(R.string.empty);
+      empty();
       return;
     }
     listHeader();
@@ -758,6 +825,24 @@ public class MainActivity extends AppCompatActivity {
               : row.title
                   .substring(0, row.title.offsetByCodePoints(0, 1))
                   .toUpperCase(getResources().getConfiguration().getLocales().get(0)));
+      boolean vocabulary = Arrays.asList("WORDS", "MEMBERS").contains(screen());
+      holder.marker.setVisibility(vocabulary ? View.VISIBLE : View.GONE);
+      holder.icon.setVisibility(vocabulary ? View.GONE : View.VISIBLE);
+      holder.icon.setImageResource(
+          "HISTORY".equals(screen())
+              ? R.drawable.ic_check
+              : "FAVORITES".equals(screen())
+                  ? R.drawable.ic_favorite
+                  : new int[] {
+                        R.drawable.ic_book,
+                        R.drawable.ic_globe,
+                        R.drawable.ic_spark,
+                        R.drawable.ic_learning
+                      }
+                      [position % 4]);
+      holder.kicker.setVisibility("TOPICS".equals(screen()) ? View.VISIBLE : View.GONE);
+      if ("TOPICS".equals(screen()))
+        holder.kicker.setText(getString(R.string.unit_label, position + 1));
       holder.title.setText(row.title);
       holder.subtitle.setText(row.subtitle);
       holder.itemView.setContentDescription(row.title + ". " + row.subtitle);
@@ -774,11 +859,14 @@ public class MainActivity extends AppCompatActivity {
   }
 
   private static class RowHolder extends RecyclerView.ViewHolder {
-    final TextView title, subtitle, marker;
+    final TextView title, subtitle, marker, kicker;
+    final ImageView icon;
 
     RowHolder(View view) {
       super(view);
       marker = view.findViewById(R.id.row_marker);
+      kicker = view.findViewById(R.id.row_kicker);
+      icon = view.findViewById(R.id.row_icon);
       title = view.findViewById(R.id.row_title);
       subtitle = view.findViewById(R.id.row_subtitle);
     }
@@ -786,6 +874,7 @@ public class MainActivity extends AppCompatActivity {
 
   private void topics(AppState s) {
     toolbar.setTitle(R.string.topics);
+    intro(R.string.path_title, R.string.path_hint, R.drawable.ic_globe);
     List<Row> data = new ArrayList<>();
     for (Topic t : s.topics)
       data.add(
@@ -814,21 +903,35 @@ public class MainActivity extends AppCompatActivity {
       return;
     }
     if (!manage) {
-      button(R.string.flashcards, () -> startFlash(route));
-      button(R.string.quiz, () -> vm.open(copyRoute(route, "QUIZ_CONFIG")));
-      if ("COLLECTION".equals(type)) {
-        button(R.string.manage_members, () -> vm.open(copyRoute(route, "MEMBERS")));
-        button(R.string.rename, () -> collectionDialog(id, name));
-        button(
-            R.string.delete_collection,
+      pair(
+          button(R.string.flashcards, () -> startFlash(route)),
+          button(R.string.quiz, () -> vm.open(copyRoute(route, "QUIZ_CONFIG"))));
+      if ("COLLECTION".equals(type))
+        menu(
+            R.string.manage_collection,
+            R.drawable.ic_topics,
             () ->
                 new MaterialAlertDialogBuilder(this)
-                    .setTitle(R.string.delete_collection)
-                    .setMessage(getString(R.string.delete_collection_message, name))
-                    .setNegativeButton(R.string.cancel, null)
-                    .setPositiveButton(R.string.confirm, (d, w) -> vm.deleteCollection(id))
+                    .setTitle(R.string.manage_collection)
+                    .setItems(
+                        new String[] {
+                          getString(R.string.manage_members),
+                          getString(R.string.rename),
+                          getString(R.string.delete_collection)
+                        },
+                        (dialog, which) -> {
+                          if (which == 0) vm.open(copyRoute(route, "MEMBERS"));
+                          else if (which == 1) collectionDialog(id, name);
+                          else
+                            new MaterialAlertDialogBuilder(this)
+                                .setTitle(R.string.delete_collection)
+                                .setMessage(getString(R.string.delete_collection_message, name))
+                                .setNegativeButton(R.string.cancel, null)
+                                .setPositiveButton(
+                                    R.string.confirm, (d, w) -> vm.deleteCollection(id))
+                                .show();
+                        })
                     .show());
-      }
     }
     EditText search = field("search." + type + id, R.string.search, InputType.TYPE_CLASS_TEXT, "");
     Runnable update =
@@ -898,12 +1001,20 @@ public class MainActivity extends AppCompatActivity {
       text(R.string.error_source);
       return;
     }
-    text(w.getEnglishWord(), true);
-    text(getString(R.string.meaning) + ": " + w.getVietnameseMeaning(), false);
-    text(getString(R.string.pronunciation) + ": " + optional(w.getPronunciation()), false);
-    text(getString(R.string.word_type) + ": " + optional(w.getWordType()), false);
-    text(getString(R.string.example) + ": " + optional(w.getExampleSentence()), false);
-    text(getString(R.string.topics) + ": " + optional(s.topicName(w.getTopicId())), false);
+    LinearLayout word = ui.panel(R.drawable.bg_soft);
+    TextView english = ui.label(w.getEnglishWord(), 32, true);
+    english.setGravity(Gravity.CENTER);
+    word.addView(english);
+    TextView pronunciation = ui.label(optional(w.getPronunciation()), 16, false);
+    pronunciation.setGravity(Gravity.CENTER);
+    word.addView(pronunciation);
+    TextView meaning = ui.label(w.getVietnameseMeaning(), 22, true);
+    meaning.setGravity(Gravity.CENTER);
+    word.addView(meaning, ui.spaced());
+    content.addView(word, ui.spaced());
+    info(R.string.word_type, optional(w.getWordType()), R.drawable.button_outline);
+    info(R.string.example, optional(w.getExampleSentence()), R.drawable.bg_blue);
+    info(R.string.topics, optional(s.topicName(w.getTopicId())), R.drawable.button_outline);
     text(status(s, id), false);
     button(s.status(id).favorite ? R.string.unstar : R.string.star, () -> vm.star(id));
     button(
@@ -924,9 +1035,11 @@ public class MainActivity extends AppCompatActivity {
 
   private void favorites(AppState s) {
     toolbar.setTitle(R.string.favorites);
-    button(R.string.favorites, () -> openSource("FAVORITES", 0, getString(R.string.favorites)));
-    button(R.string.create_collection, () -> collectionDialog(0, ""));
-    text(R.string.collections);
+    text(getString(R.string.collections), true).setTextSize(22);
+    text(R.string.collection_hint).setTextSize(13);
+    pair(
+        button(R.string.favorites, () -> openSource("FAVORITES", 0, getString(R.string.favorites))),
+        button(R.string.create_collection, () -> collectionDialog(0, "")));
     List<Row> data = new ArrayList<>();
     for (Collection c : s.collections)
       data.add(
@@ -948,6 +1061,7 @@ public class MainActivity extends AppCompatActivity {
   private void collectionForm(Bundle route) {
     long id = route.getLong("collectionId");
     toolbar.setTitle(id == 0 ? R.string.create_collection : R.string.rename);
+    intro(R.string.collections, R.string.collection_hint, R.drawable.ic_book);
     EditText name =
         field(
             "name",
@@ -959,9 +1073,20 @@ public class MainActivity extends AppCompatActivity {
 
   private void learning(AppState s) {
     toolbar.setTitle(R.string.learning);
-    button(R.string.flashcards, () -> chooseSource("FLASH"));
-    button(R.string.quiz, () -> chooseSource("QUIZ"));
-    button(R.string.review, () -> openSource("REVIEW", 0, getString(R.string.review)));
+    intro(R.string.practice_title, R.string.practice_hint, R.drawable.companion_fox);
+    section(R.string.quick_practice);
+    LinearLayout modes = tileRow();
+    tile(
+        modes,
+        R.string.flashcards,
+        R.string.flash_hint,
+        R.drawable.ic_book,
+        () -> chooseSource("FLASH"));
+    tile(modes, R.string.quiz, R.string.quiz_hint, R.drawable.ic_spark, () -> chooseSource("QUIZ"));
+    menu(
+        R.string.review,
+        R.drawable.ic_flame,
+        () -> openSource("REVIEW", 0, getString(R.string.review)));
     for (Session session : s.sessions)
       if ("IN_PROGRESS".equals(session.status))
         button(getString(R.string.pending_session, session.sourceName), () -> openSession(session));
@@ -975,6 +1100,7 @@ public class MainActivity extends AppCompatActivity {
 
   private void sources(AppState s, Bundle route) {
     toolbar.setTitle(R.string.choose_source);
+    intro(R.string.choose_source, R.string.source_hint, R.drawable.ic_book);
     List<Row> rows = new ArrayList<>();
     java.util.function.Consumer<Bundle> choose =
         b -> {
@@ -1022,6 +1148,7 @@ public class MainActivity extends AppCompatActivity {
 
   private void quizConfig(AppState s, Bundle route) {
     toolbar.setTitle(R.string.choose_quiz);
+    intro(R.string.quiz, R.string.quiz_setup_hint, R.drawable.ic_spark);
     text(getString(R.string.source_label, route.getString("sourceName")), false);
     Spinner type =
         spinner(
@@ -1079,6 +1206,8 @@ public class MainActivity extends AppCompatActivity {
     displayedFace = session.cardFace;
     Item item = items.get(displayedIndex);
     toolbar.setTitle("FLASH".equals(session.mode) ? R.string.flashcards : R.string.quiz);
+    content.addView(
+        progress(displayedIndex + 1, items.size()), new LinearLayout.LayoutParams(-1, dp(16)));
     text(getString(R.string.source_label, session.sourceName), false);
     text(
         getString(
@@ -1087,41 +1216,59 @@ public class MainActivity extends AppCompatActivity {
             items.size()),
         false);
     if ("FLASH".equals(session.mode)) {
-      TextView face = text(displayedFace ? item.meaning : item.word, true);
-      text(R.string.card_hint).setTextSize(10);
-      face.setMinHeight(dp(240));
-      face.setGravity(Gravity.CENTER);
-      face.setPadding(dp(24), dp(32), dp(24), dp(32));
-      face.setTextSize(34);
+      LinearLayout studyCard = ui.panel(R.drawable.button_outline);
+      TextView cardLabel =
+          ui.label(
+              getString(displayedFace ? R.string.flash_back : R.string.flash_front), 11, false);
+      cardLabel.setGravity(Gravity.CENTER);
+      studyCard.addView(cardLabel);
+      TextView face = ui.label(displayedFace ? item.meaning : item.word, 34, true);
       face.setTextColor(color(R.color.ui_on_brand_soft));
-      face.setBackgroundResource(R.drawable.bg_soft);
-      LinearLayout.LayoutParams faceParams = (LinearLayout.LayoutParams) face.getLayoutParams();
-      faceParams.topMargin = dp(16);
-      faceParams.bottomMargin = dp(12);
-      face.setLayoutParams(faceParams);
-      face.setContentDescription(getString(R.string.flip) + ". " + face.getText());
-      face.setOnClickListener(
-          v -> {
+      face.setGravity(Gravity.CENTER);
+      face.setMinHeight(dp(displayedFace ? 110 : 180));
+      studyCard.addView(face, new LinearLayout.LayoutParams(-1, -2));
+      if (displayedFace) {
+        int[] labels = {R.string.pronunciation, R.string.word_type, R.string.example};
+        String[] details = {item.pronunciation, item.wordType, item.example};
+        for (int n = 0; n < labels.length; n++) {
+          TextView key = ui.label(getString(labels[n]), 11, false);
+          studyCard.addView(key);
+          TextView value = ui.label(optional(details[n]), 14, false);
+          LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+          params.bottomMargin = dp(8);
+          studyCard.addView(value, params);
+        }
+      }
+      Runnable flipCard =
+          () -> {
             if (!Boolean.TRUE.equals(vm.busy.getValue()))
               vm.move(id, displayedIndex, !displayedFace, null, takeElapsed());
-          });
-      if (displayedFace) {
-        text(optional(item.pronunciation), false);
-        text(optional(item.wordType), false);
-        text(optional(item.example), false);
-      }
+          };
+      studyCard.setOnClickListener(v -> flipCard.run());
+      studyCard.setFocusable(true);
+      studyCard.setContentDescription(getString(R.string.flip) + ". " + face.getText());
+      content.addView(studyCard, ui.spaced());
+      TextView hint = text(R.string.card_hint);
+      hint.setTextSize(11);
+      hint.setGravity(Gravity.CENTER);
       MaterialButton flip =
           button(
               R.string.flip,
               () -> vm.move(id, displayedIndex, !displayedFace, null, takeElapsed()));
       flip.setContentDescription(getString(R.string.flip));
       if (item.memoryRating != null) text(R.string.rated_already);
-      button(R.string.remember, () -> vm.rate(id, displayedIndex, true, takeElapsed()))
-          .setEnabled(displayedFace && item.memoryRating == null);
-      button(R.string.need_review, () -> vm.rate(id, displayedIndex, false, takeElapsed()))
-          .setEnabled(displayedFace && item.memoryRating == null);
+      MaterialButton remember =
+          button(R.string.remember, () -> vm.rate(id, displayedIndex, true, takeElapsed()));
+      remember.setEnabled(displayedFace && item.memoryRating == null);
+      MaterialButton review =
+          button(R.string.need_review, () -> vm.rate(id, displayedIndex, false, takeElapsed()));
+      review.setEnabled(displayedFace && item.memoryRating == null);
+      pair(remember, review);
     } else {
-      text("EN_VI".equals(item.questionType) ? item.word : item.meaning, true);
+      text(R.string.choose_answer);
+      TextView prompt = text("EN_VI".equals(item.questionType) ? item.word : item.meaning, true);
+      prompt.setTextSize(28);
+      prompt.setPadding(0, dp(12), 0, dp(22));
       selectedAnswer = item.answer;
       if ("FILL".equals(item.questionType)) {
         answerField = new TextInputEditText(this);
@@ -1151,7 +1298,10 @@ public class MainActivity extends AppCompatActivity {
             choice.setText(array.getString(i));
             choice.setMinHeight(dp(60));
             choice.setPadding(dp(12), dp(8), dp(12), dp(8));
-            choice.setBackgroundResource(R.drawable.bg_soft);
+            choice.setBackgroundResource(R.drawable.answer_option);
+            choice.setTypeface(ui.bold());
+            choice.setTextSize(17);
+            choice.setButtonTintList(ColorStateList.valueOf(color(R.color.ui_brand)));
             RadioGroup.LayoutParams choiceParams = new RadioGroup.LayoutParams(-1, -2);
             choiceParams.topMargin = dp(8);
             choice.setLayoutParams(choiceParams);
@@ -1173,8 +1323,10 @@ public class MainActivity extends AppCompatActivity {
         content.addView(options);
       }
     }
-    button(R.string.previous, () -> moveSession(-1)).setEnabled(displayedIndex > 0);
-    if (displayedIndex + 1 < items.size()) button(R.string.next, () -> moveSession(1));
+    MaterialButton previous = button(R.string.previous, () -> moveSession(-1));
+    previous.setEnabled(displayedIndex > 0);
+    if (displayedIndex + 1 < items.size())
+      pair(previous, button(R.string.next, () -> moveSession(1)));
     button(
         "QUIZ".equals(session.mode) ? R.string.submit : R.string.finish,
         () -> {
@@ -1257,17 +1409,35 @@ public class MainActivity extends AppCompatActivity {
     displayedSession = null;
     activeSince = -1;
     List<Item> items = s.items.get(id);
+    intro(R.string.great_work, R.string.result_hint, R.drawable.companion_fox);
     text(getString(R.string.source_label, session.sourceName), false);
     if ("QUIZ".equals(session.mode)) {
-      text(
-          getString(
-              R.string.quiz_summary,
-              session.correctAnswers,
-              session.totalQuestions,
-              LearningRules.percent(session.correctAnswers, session.totalQuestions),
-              session.totalQuestions - session.correctAnswers,
-              duration(session.activeDurationMs)),
-          true);
+      LinearLayout summary = ui.panel(R.drawable.bg_soft);
+      TextView score =
+          ui.label(
+              String.format(
+                  getResources().getConfiguration().getLocales().get(0),
+                  "%.1f%%",
+                  LearningRules.percent(session.correctAnswers, session.totalQuestions)),
+              40,
+              true);
+      score.setGravity(Gravity.CENTER);
+      score.setTextColor(color(R.color.ui_brand));
+      summary.addView(score);
+      TextView details =
+          ui.label(
+              getString(
+                  R.string.quiz_summary,
+                  session.correctAnswers,
+                  session.totalQuestions,
+                  LearningRules.percent(session.correctAnswers, session.totalQuestions),
+                  session.totalQuestions - session.correctAnswers,
+                  duration(session.activeDurationMs)),
+              15,
+              false);
+      details.setGravity(Gravity.CENTER);
+      summary.addView(details);
+      content.addView(summary, ui.spaced());
       boolean wrong = items.stream().anyMatch(i -> Boolean.FALSE.equals(i.correct));
       button(
               R.string.retry_wrong,
@@ -1286,15 +1456,16 @@ public class MainActivity extends AppCompatActivity {
               })
           .setEnabled(wrong);
       for (Item i : items)
-        text(
-            getString(Boolean.TRUE.equals(i.correct) ? R.string.correct : R.string.incorrect)
-                + " · "
-                + getString(
+        content.addView(
+            ui.info(
+                getString(Boolean.TRUE.equals(i.correct) ? R.string.correct : R.string.incorrect),
+                getString(
                     R.string.answer_review,
                     "EN_VI".equals(i.questionType) ? i.word : i.meaning,
                     optionalAnswer(i.answer),
                     i.expected),
-            false);
+                Boolean.TRUE.equals(i.correct) ? R.drawable.bg_soft : R.drawable.bg_error),
+            ui.spaced());
     } else {
       int remembered = 0, review = 0;
       for (Item i : items) {
@@ -1319,29 +1490,28 @@ public class MainActivity extends AppCompatActivity {
 
   private void profile(AppState s) {
     toolbar.setTitle(R.string.profile);
-    TextView avatar =
-        text(
-            s.user
-                .name
-                .substring(0, s.user.name.offsetByCodePoints(0, 1))
-                .toUpperCase(getResources().getConfiguration().getLocales().get(0)),
-            true);
-    avatar.setBackgroundResource(R.drawable.bg_avatar);
-    avatar.setGravity(Gravity.CENTER);
-    avatar.setTextColor(color(R.color.ui_brand));
-    avatar.setTextSize(30);
-    avatar.setLayoutParams(new LinearLayout.LayoutParams(dp(80), dp(80)));
+    intro(R.string.profile, R.string.profile_caption, R.drawable.companion_fox);
     text(s.user.name, true);
-    text(R.string.profile_caption);
     text(s.user.email, false);
-    EditText name = field("name", R.string.display_name, InputType.TYPE_CLASS_TEXT, s.user.name);
-    button(R.string.edit_profile, () -> vm.profile(value(name)));
-    button(R.string.change_password, () -> passwordDialog());
-    button(R.string.history, () -> vm.open(AppViewModel.screen("HISTORY")));
-    button(R.string.achievements, () -> vm.open(AppViewModel.screen("ACHIEVEMENTS")));
-    button(R.string.statistics, () -> vm.open(AppViewModel.screen("STATS")));
-    button(R.string.settings, () -> vm.open(AppViewModel.screen("SETTINGS")));
-    button(R.string.about, () -> vm.open(AppViewModel.screen("ABOUT")));
+    LinearLayout counters = new LinearLayout(this);
+    metric(counters, String.valueOf(s.learned()), R.string.learned_words);
+    metric(counters, String.valueOf(s.streak()), R.string.streak_days);
+    content.addView(counters, ui.spaced());
+    section(R.string.learning_section);
+    menu(R.string.history, R.drawable.ic_check, () -> vm.open(AppViewModel.screen("HISTORY")));
+    menu(
+        R.string.achievements,
+        R.drawable.ic_trophy,
+        () -> vm.open(AppViewModel.screen("ACHIEVEMENTS")));
+    menu(R.string.statistics, R.drawable.ic_flame, () -> vm.open(AppViewModel.screen("STATS")));
+    section(R.string.account_section);
+    menu(
+        R.string.edit_profile,
+        R.drawable.ic_profile,
+        () -> vm.open(AppViewModel.screen("EDIT_PROFILE")));
+    menu(R.string.change_password, R.drawable.ic_profile, () -> passwordDialog());
+    menu(R.string.settings, R.drawable.ic_topics, () -> vm.open(AppViewModel.screen("SETTINGS")));
+    menu(R.string.about, R.drawable.ic_book, () -> vm.open(AppViewModel.screen("ABOUT")));
     button(
         R.string.logout,
         () ->
@@ -1353,6 +1523,13 @@ public class MainActivity extends AppCompatActivity {
                 .show());
   }
 
+  private void profileEditor(AppState s) {
+    toolbar.setTitle(R.string.edit_profile);
+    intro(R.string.account_section, R.string.profile_edit_hint, R.drawable.ic_profile);
+    EditText name = field("name", R.string.display_name, InputType.TYPE_CLASS_TEXT, s.user.name);
+    button(R.string.save, () -> vm.profile(value(name)));
+  }
+
   private void passwordDialog() {
     Bundle b = AppViewModel.screen("PASSWORD");
     vm.open(b);
@@ -1361,6 +1538,7 @@ public class MainActivity extends AppCompatActivity {
   private void passwordScreen() {
     content.removeAllViews();
     toolbar.setTitle(R.string.change_password);
+    intro(R.string.account_section, R.string.local_accounts, R.drawable.ic_profile);
     EditText old =
         field(
             "old",
@@ -1384,6 +1562,7 @@ public class MainActivity extends AppCompatActivity {
 
   private void history(AppState s) {
     toolbar.setTitle(R.string.history);
+    intro(R.string.history, R.string.history_hint, R.drawable.ic_check);
     Spinner mode =
         spinner(
             R.string.filter_mode,
@@ -1452,45 +1631,100 @@ public class MainActivity extends AppCompatActivity {
 
   private void statistics(AppState s) {
     toolbar.setTitle(R.string.statistics);
-    text(getString(R.string.stats_counts, s.learned(), s.mastered(), s.quizCount()), true);
+    intro(R.string.your_progress, R.string.profile_caption, R.drawable.ic_flame);
+    LinearLayout first = new LinearLayout(this);
+    metric(first, String.valueOf(s.learned()), R.string.learned_words);
+    metric(first, String.valueOf(s.mastered()), R.string.mastered_count);
+    content.addView(first, ui.spaced());
+    info(R.string.quiz_count, String.valueOf(s.quizCount()), R.drawable.button_outline);
     if (s.quizCount() == 0) text(R.string.no_scores);
-    else text(getString(R.string.stats_scores, s.average(), s.accuracy()), false);
+    else {
+      info(
+          R.string.average_score,
+          String.format(
+              getResources().getConfiguration().getLocales().get(0), "%.1f%%", s.average()),
+          R.drawable.bg_soft);
+      info(
+          R.string.overall_accuracy,
+          String.format(
+              getResources().getConfiguration().getLocales().get(0), "%.1f%%", s.accuracy()),
+          R.drawable.bg_blue);
+    }
+    section(R.string.week_activity);
     LocalDate today = LocalDate.now(),
         monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-    text(
+    info(
+        R.string.week_activity,
         getString(
             R.string.stats_time,
             duration(s.duration(today, today)),
             duration(s.duration(monday, monday.plusDays(6)))),
-        false);
+        R.drawable.button_outline);
+    long max = 1;
+    for (int i = 0; i < 7; i++)
+      max = Math.max(max, s.duration(monday.plusDays(i), monday.plusDays(i)));
+    LinearLayout chart = ui.panel(R.drawable.button_outline);
+    LinearLayout columns = new LinearLayout(this);
+    columns.setGravity(Gravity.BOTTOM);
+    java.util.Locale locale = getResources().getConfiguration().getLocales().get(0);
     for (int i = 0; i < 7; i++) {
       LocalDate day = monday.plusDays(i);
-      text(day + " · " + duration(s.duration(day, day)), false);
+      long ms = s.duration(day, day);
+      LinearLayout column = ui.column();
+      column.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+      TextView value =
+          ui.label(String.format(locale, "%d:%02d", ms / 60000, (ms / 1000) % 60), 10, false);
+      column.addView(value);
+      FrameLayout track = new FrameLayout(this);
+      LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(dp(20), dp(100));
+      tp.topMargin = dp(8);
+      tp.bottomMargin = dp(8);
+      column.addView(track, tp);
+      View bar = new View(this);
+      bar.setBackgroundResource(day.equals(today) ? R.drawable.bg_green : R.drawable.bg_soft);
+      FrameLayout.LayoutParams bp =
+          new FrameLayout.LayoutParams(
+              -1, dp(ms == 0 ? 5 : Math.max(8, (int) (90 * ms / max))), Gravity.BOTTOM);
+      track.addView(bar, bp);
+      TextView label =
+          ui.label(
+              day.format(java.time.format.DateTimeFormatter.ofPattern("EE", locale)),
+              11,
+              day.equals(today));
+      column.addView(label);
+      column.setContentDescription(day + ". " + duration(ms));
+      columns.addView(column, new LinearLayout.LayoutParams(0, -2, 1));
     }
+    chart.addView(columns);
+    content.addView(chart, ui.spaced());
   }
 
   private void achievements(AppState s) {
     toolbar.setTitle(R.string.achievements);
-    text(getString(R.string.streak_summary, s.streak(), s.longest()), true);
+    intro(R.string.earned_badges, R.string.profile_caption, R.drawable.ic_trophy);
+    text(getString(R.string.streak_summary, s.streak(), s.longest()), true).setTextSize(18);
     String[] codes = {"START", "WORDS_50", "STREAK_7", "PERFECT"};
     int[] labels = {
       R.string.badge_start, R.string.badge_words, R.string.badge_streak, R.string.badge_perfect
     };
     for (int i = 0; i < codes.length; i++) {
-      String code = codes[i];
-      Achievement found = null;
-      for (Achievement a : s.achievements) if (a.code.equals(code)) found = a;
-      text(labels[i]);
-      text(
-          found == null
-              ? getString(R.string.not_earned)
-              : getString(R.string.earned, date(found.achievedAt)),
-          false);
+      Achievement earned = null;
+      for (Achievement a : s.achievements) if (a.code.equals(codes[i])) earned = a;
+      content.addView(
+          ui.info(
+              getString(labels[i]),
+              earned == null
+                  ? getString(R.string.not_earned)
+                  : getString(R.string.earned, date(earned.achievedAt)),
+              earned == null ? R.drawable.button_outline : R.drawable.bg_orange),
+          ui.spaced());
     }
   }
 
   private void settings(AppState s) {
     toolbar.setTitle(R.string.settings);
+    intro(R.string.settings, R.string.settings_hint, R.drawable.ic_topics);
+    section(R.string.appearance_section);
     Spinner theme =
         spinner(
             R.string.theme,
@@ -1502,6 +1736,7 @@ public class MainActivity extends AppCompatActivity {
             R.string.language,
             Arrays.asList(getString(R.string.language_vi), getString(R.string.language_en)),
             "en".equals(s.settings.language) ? 1 : 0);
+    section(R.string.habit_section);
     EditText goal =
         field(
             "goal",
@@ -1510,7 +1745,11 @@ public class MainActivity extends AppCompatActivity {
             String.valueOf(s.settings.dailyGoal));
     SwitchMaterial reminder = new SwitchMaterial(this);
     reminder.setText(R.string.reminder);
-    reminder.setMinHeight(dp(48));
+    reminder.setMinHeight(dp(60));
+    reminder.setTypeface(ui.bold());
+    reminder.setTextColor(color(R.color.ui_ink));
+    reminder.setPadding(dp(14), dp(8), dp(14), dp(8));
+    reminder.setBackgroundResource(R.drawable.button_outline);
     reminder.setChecked(
         Boolean.parseBoolean(vm.input("SETTINGS.reminder", String.valueOf(s.settings.reminder))));
     content.addView(reminder);
@@ -1575,6 +1814,7 @@ public class MainActivity extends AppCompatActivity {
               time[0],
               time[1]);
         });
+    section(R.string.data_section);
     button(
         R.string.open_app_settings,
         () ->
@@ -1604,6 +1844,7 @@ public class MainActivity extends AppCompatActivity {
 
   private void about() {
     toolbar.setTitle(R.string.about);
+    intro(R.string.app_name, R.string.about_description, R.drawable.companion_fox);
     text(R.string.app_name);
     try {
       text(

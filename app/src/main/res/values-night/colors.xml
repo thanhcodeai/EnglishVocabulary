@@ -1,11 +1,19 @@
 <resources>
-    <color name="ui_brand">#BEB0FF</color>
-    <color name="ui_brand_soft">#32294E</color>
-    <color name="ui_on_brand_soft">#E8DEFF</color>
-    <color name="ui_page">#14151F</color>
-    <color name="ui_card">#202230</color>
-    <color name="ui_ink">#F0EFF8</color>
-    <color name="ui_muted">#B1B2C9</color>
-    <color name="ui_line">#383A4D</color>
-    <color name="ui_accent">#F3B47D</color>
+<color name="ui_brand">#8CE34F</color>
+<color name="ui_brand_soft">#263E29</color>
+<color name="ui_on_brand_soft">#C2F1A2</color>
+<color name="ui_page">#121F24</color>
+<color name="ui_card">#192D34</color>
+<color name="ui_ink">#E9F3F4</color>
+<color name="ui_muted">#B1C4C8</color>
+<color name="ui_line">#34505A</color>
+<color name="ui_accent">#F2BE65</color>
+<color name="ui_green">#58CC02</color>
+<color name="ui_green_edge">#43A600</color>
+<color name="ui_blue">#79D5FF</color>
+<color name="ui_blue_soft">#203C4A</color>
+<color name="ui_orange_soft">#3B3527</color>
+<color name="ui_red">#FFAAA3</color>
+<color name="ui_red_soft">#432C31</color>
+<color name="ui_disabled">#243940</color>
 </resources>
