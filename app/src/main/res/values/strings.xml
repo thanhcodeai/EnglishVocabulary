@@ -155,4 +155,19 @@
     <string name="language_vi">Tiếng Việt</string>
     <string name="language_en">English</string>
     <string name="apply_filter">Áp dụng bộ lọc</string>
+    <string name="home_kicker">MỖI NGÀY MỘT CHÚT TIẾN BỘ</string>
+    <string name="home_headline">Một bước nhỏ,\nmột từ mới.</string>
+    <string name="home_caption">Dành vài phút cho tiếng Anh hôm nay.</string>
+    <string name="quick_practice">Góc học tập</string>
+    <string name="flash_hint">Lật thẻ, nhớ lâu hơn</string>
+    <string name="quiz_hint">Thử sức với điều đã học</string>
+    <string name="explore_hint">Khám phá từ theo chủ đề</string>
+    <string name="favorite_hint">Những từ bạn muốn giữ lại</string>
+    <string name="auth_headline">Thêm một từ mới.\nMở thêm một thế giới.</string>
+    <string name="auth_caption">Không cần vội. Học theo nhịp của bạn.</string>
+    <string name="daily_target">Mục tiêu hôm nay</string>
+    <string name="streak_days">Ngày liên tiếp</string>
+    <string name="learned_words">Từ đã học</string>
+    <string name="card_hint">CHẠM VÀO THẺ ĐỂ LẬT</string>
+    <string name="profile_caption">Hành trình học của riêng bạn</string>
 </resources>

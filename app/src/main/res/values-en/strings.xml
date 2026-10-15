@@ -155,4 +155,19 @@
     <string name="language_vi">Tiếng Việt</string>
     <string name="language_en">English</string>
     <string name="apply_filter">Apply filters</string>
+    <string name="home_kicker">A LITTLE BETTER EVERY DAY</string>
+    <string name="home_headline">Small steps.\nNew words.</string>
+    <string name="home_caption">Make a little room for English today.</string>
+    <string name="quick_practice">Your practice space</string>
+    <string name="flash_hint">Flip a card. Make it stick.</string>
+    <string name="quiz_hint">Put your knowledge to the test</string>
+    <string name="explore_hint">Discover words by topic</string>
+    <string name="favorite_hint">Keep your favorite words close</string>
+    <string name="auth_headline">One more word.\nA world of possibilities.</string>
+    <string name="auth_caption">No rush. Learn at your own pace.</string>
+    <string name="daily_target">Today’s goal</string>
+    <string name="streak_days">Day streak</string>
+    <string name="learned_words">Words studied</string>
+    <string name="card_hint">TAP THE CARD TO FLIP</string>
+    <string name="profile_caption">Your own learning journey</string>
 </resources>

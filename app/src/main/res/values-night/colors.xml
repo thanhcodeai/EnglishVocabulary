@@ -1,0 +1,11 @@
+<resources>
+    <color name="ui_brand">#BEB0FF</color>
+    <color name="ui_brand_soft">#32294E</color>
+    <color name="ui_on_brand_soft">#E8DEFF</color>
+    <color name="ui_page">#14151F</color>
+    <color name="ui_card">#202230</color>
+    <color name="ui_ink">#F0EFF8</color>
+    <color name="ui_muted">#B1B2C9</color>
+    <color name="ui_line">#383A4D</color>
+    <color name="ui_accent">#F3B47D</color>
+</resources>

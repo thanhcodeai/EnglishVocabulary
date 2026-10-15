@@ -1,5 +1,11 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <color name="ui_brand">#6650D9</color>
+    <color name="ui_brand_soft">#EEE9FF</color>
+    <color name="ui_on_brand_soft">#322365</color>
+    <color name="ui_page">#F7F8FC</color>
+    <color name="ui_card">#FFFFFF</color>
+    <color name="ui_ink">#22253F</color>
+    <color name="ui_muted">#73778E</color>
+    <color name="ui_line">#E7E8F0</color>
+    <color name="ui_accent">#E99557</color>
 </resources>

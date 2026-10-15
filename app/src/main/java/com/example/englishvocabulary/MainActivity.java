@@ -3,6 +3,9 @@ package com.example.englishvocabulary;
 import android.Manifest;
 import android.content.*;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.*;
 import android.text.*;
@@ -13,6 +16,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.*;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.os.LocaleListCompat;
 import androidx.core.view.*;
@@ -27,6 +31,7 @@ import com.example.englishvocabulary.ui.AppViewModel;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.google.android.material.switchmaterial.SwitchMaterial;
@@ -238,7 +243,10 @@ public class MainActivity extends AppCompatActivity {
         title
             ? com.google.android.material.R.style.TextAppearance_Material3_HeadlineSmall
             : com.google.android.material.R.style.TextAppearance_Material3_BodyLarge);
-    v.setPadding(0, dp(8), 0, dp(8));
+    v.setTextColor(color(title ? R.color.ui_ink : R.color.ui_muted));
+    v.setLineSpacing(dp(3), 1f);
+    if (title) v.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+    v.setPadding(0, dp(10), 0, dp(10));
     content.addView(v, new LinearLayout.LayoutParams(-1, -2));
     return v;
   }
@@ -250,29 +258,84 @@ public class MainActivity extends AppCompatActivity {
   private MaterialButton button(CharSequence label, Runnable action) {
     MaterialButton b = new MaterialButton(this);
     b.setText(label);
-    b.setMinHeight(dp(48));
+    b.setMinHeight(dp(54));
+    b.setCornerRadius(dp(16));
+    b.setTextSize(15);
+    b.setAllCaps(false);
+    b.setInsetTop(0);
+    b.setInsetBottom(0);
+    b.setStrokeWidth(dp(1));
+    b.setStrokeColor(ColorStateList.valueOf(color(R.color.ui_line)));
+    b.setBackgroundTintList(
+        new ColorStateList(
+            new int[][] {new int[] {-android.R.attr.state_enabled}, new int[] {}},
+            new int[] {color(R.color.ui_line), color(R.color.ui_card)}));
+    b.setTextColor(
+        new ColorStateList(
+            new int[][] {new int[] {-android.R.attr.state_enabled}, new int[] {}},
+            new int[] {color(R.color.ui_muted), color(R.color.ui_brand)}));
     b.setOnClickListener(
         v -> {
           if (!Boolean.TRUE.equals(vm.busy.getValue())) action.run();
         });
-    content.addView(b, new LinearLayout.LayoutParams(-1, -2));
+    LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(-1, -2);
+    buttonParams.topMargin = dp(8);
+    buttonParams.bottomMargin = dp(4);
+    content.addView(b, buttonParams);
     return b;
   }
 
   private MaterialButton button(int resource, Runnable action) {
-    return button(getString(resource), action);
+    MaterialButton b = button(getString(resource), action);
+    if (Arrays.asList(
+            R.string.save,
+            R.string.start,
+            R.string.sign_in,
+            R.string.register,
+            R.string.submit,
+            R.string.finish,
+            R.string.remember)
+        .contains(resource)) {
+      b.setStrokeWidth(0);
+      b.setBackgroundTintList(
+          new ColorStateList(
+              new int[][] {new int[] {-android.R.attr.state_enabled}, new int[] {}},
+              new int[] {color(R.color.ui_line), color(R.color.ui_brand)}));
+      int onPrimary =
+          com.google.android.material.color.MaterialColors.getColor(
+              b, com.google.android.material.R.attr.colorOnPrimary);
+      b.setTextColor(
+          new ColorStateList(
+              new int[][] {new int[] {-android.R.attr.state_enabled}, new int[] {}},
+              new int[] {color(R.color.ui_muted), onPrimary}));
+    }
+    if (resource == R.string.delete_collection
+        || resource == R.string.reset_learning
+        || resource == R.string.logout)
+      b.setTextColor(
+          com.google.android.material.color.MaterialColors.getColor(
+              b, androidx.appcompat.R.attr.colorError));
+    return b;
   }
 
   private EditText field(String key, int label, int inputType, String initial) {
     TextInputLayout wrapper = new TextInputLayout(this);
     wrapper.setHint(getString(label));
     wrapper.setBoxBackgroundMode(TextInputLayout.BOX_BACKGROUND_OUTLINE);
+    wrapper.setBoxCornerRadii(dp(16), dp(16), dp(16), dp(16));
+    wrapper.setBoxBackgroundColor(color(R.color.ui_card));
+    if ((inputType & InputType.TYPE_TEXT_VARIATION_PASSWORD)
+        == InputType.TYPE_TEXT_VARIATION_PASSWORD)
+      wrapper.setEndIconMode(TextInputLayout.END_ICON_PASSWORD_TOGGLE);
     TextInputEditText edit = new TextInputEditText(wrapper.getContext());
     edit.setInputType(inputType);
     edit.setMinHeight(dp(56));
     edit.setText(vm.input(screen() + "." + key, initial));
     wrapper.addView(edit, new LinearLayout.LayoutParams(-1, -2));
-    content.addView(wrapper, new LinearLayout.LayoutParams(-1, -2));
+    LinearLayout.LayoutParams fieldParams = new LinearLayout.LayoutParams(-1, -2);
+    fieldParams.topMargin = dp(10);
+    fieldParams.bottomMargin = dp(6);
+    content.addView(wrapper, fieldParams);
     fields.put(key, wrapper);
     final String inputKey = screen() + "." + key;
     edit.addTextChangedListener(
@@ -432,7 +495,10 @@ public class MainActivity extends AppCompatActivity {
 
   private void auth(boolean registration) {
     toolbar.setTitle(registration ? R.string.register : R.string.sign_in);
-    text(R.string.local_accounts);
+    text(getString(R.string.auth_headline), true).setTextSize(30);
+    text(R.string.auth_caption);
+    TextView local = text(R.string.local_accounts);
+    local.setTextSize(12);
     EditText name =
         registration ? field("name", R.string.display_name, InputType.TYPE_CLASS_TEXT, "") : null;
     EditText email =
@@ -464,7 +530,10 @@ public class MainActivity extends AppCompatActivity {
     button(
         registration ? R.string.sign_in : R.string.register,
         () -> vm.root(registration ? "LOGIN" : "REGISTER"));
-    button(R.string.retry, vm::refresh);
+    MaterialButton reload = button(R.string.retry, vm::refresh);
+    reload.setStrokeWidth(0);
+    reload.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT));
+    reload.setTextSize(13);
   }
 
   private Bundle sourceRoute(String page, String type, long id, String name) {
@@ -480,21 +549,149 @@ public class MainActivity extends AppCompatActivity {
     vm.open(sourceRoute("WORDS", type, id, name));
   }
 
+  private int color(int resource) {
+    return ContextCompat.getColor(this, resource);
+  }
+
+  private TextView label(CharSequence value, int size, int color) {
+    TextView text = new TextView(this);
+    text.setText(value);
+    text.setTextSize(size);
+    text.setTextColor(color);
+    text.setLineSpacing(dp(3), 1f);
+    return text;
+  }
+
+  private LinearLayout vertical() {
+    LinearLayout box = new LinearLayout(this);
+    box.setOrientation(LinearLayout.VERTICAL);
+    return box;
+  }
+
+  private void space(LinearLayout parent, int height) {
+    View gap = new View(this);
+    parent.addView(gap, new LinearLayout.LayoutParams(1, dp(height)));
+  }
+
+  private void metric(LinearLayout parent, String value, int caption) {
+    LinearLayout box = vertical();
+    box.setPadding(dp(18), dp(18), dp(18), dp(18));
+    box.setBackgroundResource(R.drawable.bg_soft);
+    TextView number = label(value, 26, color(R.color.ui_on_brand_soft));
+    number.setTypeface(Typeface.DEFAULT_BOLD);
+    box.addView(number);
+    space(box, 6);
+    box.addView(label(getString(caption), 12, color(R.color.ui_on_brand_soft)));
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -2, 1);
+    params.setMarginEnd(dp(8));
+    parent.addView(box, params);
+  }
+
+  private void tile(LinearLayout row, int title, int subtitle, int icon, Runnable action) {
+    MaterialCardView card = new MaterialCardView(this);
+    card.setRadius(dp(24));
+    card.setCardElevation(0);
+    card.setCardBackgroundColor(color(R.color.ui_card));
+    card.setStrokeColor(color(R.color.ui_line));
+    card.setStrokeWidth(dp(1));
+    card.setClickable(true);
+    card.setFocusable(true);
+    LinearLayout box = vertical();
+    box.setPadding(dp(18), dp(20), dp(16), dp(20));
+    ImageView image = new ImageView(this);
+    image.setImageResource(icon);
+    image.setImageTintList(ColorStateList.valueOf(color(R.color.ui_brand)));
+    image.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+    box.addView(image, new LinearLayout.LayoutParams(dp(28), dp(28)));
+    space(box, 18);
+    TextView heading = label(getString(title), 17, color(R.color.ui_ink));
+    heading.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+    box.addView(heading);
+    space(box, 6);
+    box.addView(label(getString(subtitle), 12, color(R.color.ui_muted)));
+    card.addView(box);
+    card.setContentDescription(getString(title) + ". " + getString(subtitle));
+    card.setOnClickListener(
+        v -> {
+          if (!Boolean.TRUE.equals(vm.busy.getValue())) action.run();
+        });
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -1, 1);
+    params.setMarginEnd(dp(8));
+    row.addView(card, params);
+  }
+
+  private LinearLayout tileRow() {
+    LinearLayout row = new LinearLayout(this);
+    row.setOrientation(LinearLayout.HORIZONTAL);
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+    params.topMargin = dp(10);
+    params.bottomMargin = dp(2);
+    content.addView(row, params);
+    return row;
+  }
+
   private void home(AppState s) {
-    toolbar.setTitle(R.string.home);
-    text(getString(R.string.greeting, s.user.name), true);
-    text(getString(R.string.progress, s.today(), s.settings.dailyGoal), false);
+    toolbar.setTitle(R.string.app_name);
+    TextView kicker = text(getString(R.string.home_kicker), false);
+    kicker.setTextSize(10);
+    kicker.setLetterSpacing(.12f);
+    text(getString(R.string.greeting, s.user.name), true).setTextSize(25);
+    text(R.string.home_caption);
+    LinearLayout hero = vertical();
+    hero.setPadding(dp(24), dp(24), dp(24), dp(24));
+    hero.setBackgroundResource(R.drawable.bg_hero);
+    TextView headline = label(getString(R.string.home_headline), 30, Color.WHITE);
+    headline.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+    hero.addView(headline);
+    space(hero, 22);
+    hero.addView(label(getString(R.string.daily_target), 13, 0xFFE5DFFF));
+    space(hero, 6);
+    TextView goal =
+        label(getString(R.string.progress, s.today(), s.settings.dailyGoal), 17, Color.WHITE);
+    hero.addView(goal);
+    space(hero, 14);
     LinearProgressIndicator progress = new LinearProgressIndicator(this);
     progress.setMax(100);
+    progress.setTrackCornerRadius(dp(4));
+    progress.setTrackThickness(dp(7));
+    progress.setIndicatorColor(Color.WHITE);
+    progress.setTrackColor(0x447C6ACC);
     progress.setProgress((int) Math.min(100, 100L * s.today() / s.settings.dailyGoal));
-    progress.setContentDescription(getString(R.string.progress, s.today(), s.settings.dailyGoal));
-    content.addView(progress, new LinearLayout.LayoutParams(-1, dp(12)));
-    text(getString(R.string.total_learned, s.learned()), false);
-    if (s.learned() == 0) text(R.string.start_hint);
-    button(R.string.topics, () -> vm.root("TOPICS"));
-    button(R.string.flashcards, () -> chooseSource("FLASH"));
-    button(R.string.quiz, () -> chooseSource("QUIZ"));
-    button(R.string.favorites, () -> vm.root("FAVORITES"));
+    progress.setContentDescription(goal.getText());
+    hero.addView(progress, new LinearLayout.LayoutParams(-1, dp(8)));
+    LinearLayout.LayoutParams heroParams = new LinearLayout.LayoutParams(-1, -2);
+    heroParams.topMargin = dp(12);
+    heroParams.bottomMargin = dp(18);
+    content.addView(hero, heroParams);
+    LinearLayout metrics = new LinearLayout(this);
+    metrics.setOrientation(LinearLayout.HORIZONTAL);
+    metric(metrics, String.valueOf(s.learned()), R.string.learned_words);
+    metric(metrics, String.valueOf(s.streak()), R.string.streak_days);
+    content.addView(metrics);
+    text(getString(R.string.quick_practice), true).setTextSize(20);
+    LinearLayout first = tileRow();
+    tile(
+        first,
+        R.string.flashcards,
+        R.string.flash_hint,
+        R.drawable.ic_learning,
+        () -> chooseSource("FLASH"));
+    tile(
+        first, R.string.quiz, R.string.quiz_hint, R.drawable.ic_topics, () -> chooseSource("QUIZ"));
+    LinearLayout second = tileRow();
+    tile(
+        second,
+        R.string.topics,
+        R.string.explore_hint,
+        R.drawable.ic_topics,
+        () -> vm.root("TOPICS"));
+    tile(
+        second,
+        R.string.favorites,
+        R.string.favorite_hint,
+        R.drawable.ic_favorite,
+        () -> vm.root("FAVORITES"));
+    if (s.learned() == 0) text(R.string.start_hint).setTextSize(13);
     button(R.string.review, () -> openSource("REVIEW", 0, getString(R.string.review)));
     for (Session session : s.sessions)
       if ("IN_PROGRESS".equals(session.status))
@@ -555,6 +752,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onBindViewHolder(@NonNull RowHolder holder, int position) {
       Row row = data.get(position);
+      holder.marker.setText(
+          row.title.isEmpty()
+              ? ""
+              : row.title
+                  .substring(0, row.title.offsetByCodePoints(0, 1))
+                  .toUpperCase(getResources().getConfiguration().getLocales().get(0)));
       holder.title.setText(row.title);
       holder.subtitle.setText(row.subtitle);
       holder.itemView.setContentDescription(row.title + ". " + row.subtitle);
@@ -571,10 +774,11 @@ public class MainActivity extends AppCompatActivity {
   }
 
   private static class RowHolder extends RecyclerView.ViewHolder {
-    final TextView title, subtitle;
+    final TextView title, subtitle, marker;
 
     RowHolder(View view) {
       super(view);
+      marker = view.findViewById(R.id.row_marker);
       title = view.findViewById(R.id.row_title);
       subtitle = view.findViewById(R.id.row_subtitle);
     }
@@ -884,7 +1088,17 @@ public class MainActivity extends AppCompatActivity {
         false);
     if ("FLASH".equals(session.mode)) {
       TextView face = text(displayedFace ? item.meaning : item.word, true);
-      face.setMinHeight(dp(96));
+      text(R.string.card_hint).setTextSize(10);
+      face.setMinHeight(dp(240));
+      face.setGravity(Gravity.CENTER);
+      face.setPadding(dp(24), dp(32), dp(24), dp(32));
+      face.setTextSize(34);
+      face.setTextColor(color(R.color.ui_on_brand_soft));
+      face.setBackgroundResource(R.drawable.bg_soft);
+      LinearLayout.LayoutParams faceParams = (LinearLayout.LayoutParams) face.getLayoutParams();
+      faceParams.topMargin = dp(16);
+      faceParams.bottomMargin = dp(12);
+      face.setLayoutParams(faceParams);
       face.setContentDescription(getString(R.string.flip) + ". " + face.getText());
       face.setOnClickListener(
           v -> {
@@ -914,7 +1128,9 @@ public class MainActivity extends AppCompatActivity {
         answerField.setInputType(
             InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         answerField.setHint(R.string.typed_answer);
-        answerField.setMinHeight(dp(56));
+        answerField.setMinHeight(dp(64));
+        answerField.setPadding(dp(18), dp(12), dp(18), dp(12));
+        answerField.setBackgroundResource(R.drawable.bg_soft);
         answerField.setText(item.answer);
         content.addView(answerField, new LinearLayout.LayoutParams(-1, -2));
         answerField.addTextChangedListener(
@@ -933,7 +1149,12 @@ public class MainActivity extends AppCompatActivity {
             RadioButton choice = new RadioButton(this);
             choice.setId(View.generateViewId());
             choice.setText(array.getString(i));
-            choice.setMinHeight(dp(48));
+            choice.setMinHeight(dp(60));
+            choice.setPadding(dp(12), dp(8), dp(12), dp(8));
+            choice.setBackgroundResource(R.drawable.bg_soft);
+            RadioGroup.LayoutParams choiceParams = new RadioGroup.LayoutParams(-1, -2);
+            choiceParams.topMargin = dp(8);
+            choice.setLayoutParams(choiceParams);
             options.addView(choice);
             if (Objects.equals(item.answer, array.getString(i))) choice.setChecked(true);
           }
@@ -1098,7 +1319,20 @@ public class MainActivity extends AppCompatActivity {
 
   private void profile(AppState s) {
     toolbar.setTitle(R.string.profile);
+    TextView avatar =
+        text(
+            s.user
+                .name
+                .substring(0, s.user.name.offsetByCodePoints(0, 1))
+                .toUpperCase(getResources().getConfiguration().getLocales().get(0)),
+            true);
+    avatar.setBackgroundResource(R.drawable.bg_avatar);
+    avatar.setGravity(Gravity.CENTER);
+    avatar.setTextColor(color(R.color.ui_brand));
+    avatar.setTextSize(30);
+    avatar.setLayoutParams(new LinearLayout.LayoutParams(dp(80), dp(80)));
     text(s.user.name, true);
+    text(R.string.profile_caption);
     text(s.user.email, false);
     EditText name = field("name", R.string.display_name, InputType.TYPE_CLASS_TEXT, s.user.name);
     button(R.string.edit_profile, () -> vm.profile(value(name)));
